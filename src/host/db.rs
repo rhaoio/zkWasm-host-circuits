@@ -299,7 +299,7 @@ impl RocksDB {
     fn validate_merkle_record_set_for_read_only(&self, record: &MerkleRecord) -> Result<()> {
         if self
             .get_merkle_record(&record.hash)?
-            .map_or(true, |it| it != *record)
+            .map_or(true, |it| it.hash != record.hash)
         {
             Err(anyhow::anyhow!(
                 "Read only mode! Merkle record does not match, record {:?} should already be set",
@@ -329,7 +329,8 @@ impl TreeDB for RocksDB {
     fn get_merkle_record(&self, hash: &[u8; 32]) -> Result<Option<MerkleRecord>> {
         let cf = self.db.cf_handle(&self.merkle_cf_name)
             .ok_or_else(|| anyhow::anyhow!("Merkle column family not found"))?;
-
+        println!("get_merkle_record");
+            println!("hash: {:?}", hash);
         match self.db.get_cf(cf, hash.clone())? {
             Some(data) => {
                 let record = MerkleRecord::from_slice(&data)?;
@@ -368,7 +369,8 @@ impl TreeDB for RocksDB {
     fn set_merkle_records(&mut self, records: &Vec<MerkleRecord>) -> Result<()> {
         let cf = self.db.cf_handle(&self.merkle_cf_name)
             .ok_or_else(|| anyhow::anyhow!("Merkle column family not found"))?;
-
+        println!("set_merkle_records");
+        println!("records: {:?}", records);
         if self.read_only {
             for record in records {
                 self.validate_merkle_record_set_for_read_only(record)?;
@@ -377,6 +379,7 @@ impl TreeDB for RocksDB {
         }
         if !self.record_db.is_some() {
             let mut batch = WriteBatch::default();
+            
             for record in records {
                 let serialized = record.to_slice();
                 batch.put_cf(cf, &record.hash, serialized);
@@ -388,6 +391,9 @@ impl TreeDB for RocksDB {
                 .ok_or_else(|| anyhow::anyhow!("Merkle column family not found"))?;
             let mut batch = WriteBatch::default();
             let mut record_db_batch = WriteBatch::default();
+            println!("set_merkle_records_WITH_RECORD_DB");
+            println!("records: {:?}", records);
+            
             for record in records {
                 let serialized = record.to_slice();
                 batch.put_cf(cf, &record.hash, serialized.clone());
